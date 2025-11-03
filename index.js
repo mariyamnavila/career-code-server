@@ -4,7 +4,7 @@ const app = express();
 const port = process.env.PORT || 3000;
 require('dotenv').config()
 
-const { MongoClient, ServerApiVersion } = require('mongodb');
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 app.use(cors());
 app.use(express.json())
 // career_Admin
@@ -28,6 +28,13 @@ async function run() {
         app.get('/jobs', async (req, res) => {
             const cursor = jobsCollection.find();
             const result = await cursor.toArray();
+            res.send(result)
+        })
+
+        app.get('/jobs/:id', async (req, res) => {
+            const id = req.params.id;
+            const query = { _id: new ObjectId(id) }
+            const result = await jobsCollection.findOne(query)
             res.send(result)
         })
 
