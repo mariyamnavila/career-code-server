@@ -1,14 +1,41 @@
 const express = require('express');
 const cors = require('cors');
 const app = express();
+const cookieParser = require('cookie-parser')
+const jwt = require('jsonwebtoken');
 const port = process.env.PORT || 3000;
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 require('dotenv').config()
 
-const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
-app.use(cors());
+// middleware
+app.use(cors({
+    origin: ['http://localhost:5173'],
+    credentials: true
+}));
 app.use(express.json())
-// career_Admin
-// LdLYjNw0CrJr5oCV
+app.use(cookieParser())
+
+const logger = (req, res, next) => {
+    next()
+}
+
+const verifyToken = (req, res, next) => {
+    const token = req?.cookies?.token;
+    console.log(token);
+    if (!token) {
+        return res.status(401).send({ message: 'unauthorized access' })
+    }
+    jwt.verify(token, process.env.JWT_ACCESS_SECRET, (err, decoded) => {
+        if (err) {
+            return res.status(401).send({ message: 'unauthorized access' })
+        }
+        req.decoded = decoded
+        next()
+    })
+    // 
+
+}
+
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster033.bpxhzqh.mongodb.net/?appName=Cluster033`;
 
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version
@@ -25,6 +52,18 @@ async function run() {
 
         const jobsCollection = client.db('careerCode').collection('jobs')
         const applicationsCollection = client.db('careerCode').collection('applications')
+
+        // jwt token related apis
+        app.post('/jwt', async (req, res) => {
+            const userData = req.body;
+            const token = jwt.sign(userData, process.env.JWT_ACCESS_SECRET, { expiresIn: '1d' })
+            res.cookie('token', token, {
+                httpOnly: true,
+                secure: false,
+
+            })
+            res.send({ success: true })
+        })
 
         app.get('/jobs', async (req, res) => {
             const email = req.query.email;
@@ -74,8 +113,11 @@ async function run() {
 
         // job applications
 
-        app.get('/applications', async (req, res) => {
+        app.get('/applications', logger, verifyToken, async (req, res) => {
             const email = req.query.email;
+            if (email !== req.decoded.email) {
+                return res.status(403).send({ message: 'forbidden access' })
+            }
             const query = {
                 applicant: email
             }
